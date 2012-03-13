@@ -38,7 +38,8 @@ echo "Starting run_Calibrate.csh" `date`
 mkdir log
 mkdir plots
 
-for num in `seq 0 9`; do
+process_subband() {
+    num=${i}
     echo "Starting work on subband" $num `date`
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
@@ -65,7 +66,12 @@ for num in `seq 0 9`; do
     calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres --instrument-db ${cal}/instrument ${source}.gds ../correct.parset /home/hassall/MSSS/dummy.model `pwd` > log/calibrate_image_${num}.txt
 
     echo "Finished subband" ${num} `date`
-done #end of loop
+}
+
+for num in `seq 0 9`; do
+    process_subband $num &
+done
+wait
 
 echo "msin=[${obs_id}_SAP00${beam}_SB${targ_band}"`seq -s "_target_sub.MS.dppp, ${obs_id}_SAP00${beam}_SB${targ_band}" 0 9`"_target_sub.MS.dppp]"> NDPPP.parset
 echo "msin.missingdata=true" >> NDPPP.parset
