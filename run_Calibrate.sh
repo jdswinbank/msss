@@ -35,16 +35,19 @@ echo "Starting run_Calibrate.csh" `date`
 #done
 #exit
 
-mkdir log
-mkdir plots
+if [ -d ${combined} ]; then
+    echo "Removing ${combined}"
+    rm -rf ${combined}
+fi
+
+test -d log || mkdir log
+test -d plots || mkdir plots
 
 process_subband() {
     num=${1}
     echo "Starting work on subband" $num `date`
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
-
-    rm -rf ${combined}
 
     makevds ~pizzo/cep2.clusterdesc ${source}
     makevds ~pizzo/cep2.clusterdesc ${cal}
@@ -94,7 +97,6 @@ rficonsole -indirect-read ${combined}
 
 echo "Calibrating FINAL IMAGE"
 echo "Starting phase-only calibration" `date`
-#calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${combined}.gds /home/csobey/MSSS/phaseonly.parset ${skyModel} `pwd` >log/calibrate_final_image2.txt
 calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${combined}.gds ../phaseonly.parset ${skyModel} `pwd` >log/calibrate_final_image2.txt
 
 echo "Finished phase-only calibration" `date`
