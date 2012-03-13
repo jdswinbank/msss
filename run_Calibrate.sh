@@ -5,14 +5,14 @@ band=$3
 key=$4
 skyModel=$5
 calModel=$6
-if [ "${beam}" = 0 ]; then 
+if [ "${beam}" = 0 ]; then
     targ_band=0`echo $band | bc`
     cal_band=`echo $band+16 | bc`
-else 
+else
     if [ "${beam}" =  1 ]; then
         targ_band=`echo $band+8 | bc`
-    cal_band=`echo $band+16 | bc` 
-    
+    cal_band=`echo $band+16 | bc`
+
     fi
 fi
 
@@ -42,28 +42,28 @@ for num in `seq 0 9`; do
     echo "Starting work on subband" $num `date`
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
-    
+
     rm -rf ${combined}
-    
+
     makevds ~pizzo/cep2.clusterdesc ${source}
     makevds ~pizzo/cep2.clusterdesc ${cal}
     combinevds ${source}.gds ${source}.vds
     combinevds ${cal}.gds ${cal}.vds
-    
+
     echo "Calibrating CALIBRATOR..."
     #calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${cal}.gds /home/csobey/MSSS/cal.parset ${calModel} `pwd` > log/calibrate_cal_${num}.txt
     calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${cal}.gds ../cal.parset ${calModel} `pwd` > log/calibrate_cal_${num}.txt
-    
+
     echo "Zapping suspect points..."
-    ~swinbank/edit_parmdb/edit_parmdb.py --sigma=2 --auto ${cal}/instrument/
-    
+    ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/
+
     echo "Making diagnostic plots..."
-    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/ 
-    
+    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/
+
     echo "Calibrating IMAGE..."
     #calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres --instrument-db ${cal}/instrument ${source}.gds /home/csobey/MSSS/correct.parset /home/hassall/MSSS/dummy.model `pwd` > log/calibrate_image_${num}.txt
     calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres --instrument-db ${cal}/instrument ${source}.gds ../correct.parset /home/hassall/MSSS/dummy.model `pwd` > log/calibrate_image_${num}.txt
-    
+
     echo "Finished subband" ${num} `date`
 done #end of loop
 
