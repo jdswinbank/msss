@@ -39,7 +39,7 @@ mkdir log
 mkdir plots
 
 process_subband() {
-    num=${i}
+    num=${1}
     echo "Starting work on subband" $num `date`
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
@@ -52,8 +52,7 @@ process_subband() {
     combinevds ${cal}.gds ${cal}.vds
 
     echo "Calibrating CALIBRATOR..."
-    #calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${cal}.gds /home/csobey/MSSS/cal.parset ${calModel} `pwd` > log/calibrate_cal_${num}.txt
-    calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${cal}.gds ../cal.parset ${calModel} `pwd` > log/calibrate_cal_${num}.txt
+    calibrate -f --key ${key}-${num} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${cal}.gds ../cal.parset ${calModel} `pwd` > log/calibrate_cal_${num}.txt
 
     echo "Zapping suspect points..."
     ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/
@@ -61,9 +60,8 @@ process_subband() {
     echo "Making diagnostic plots..."
     ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/
 
-    echo "Calibrating IMAGE..."
-    #calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres --instrument-db ${cal}/instrument ${source}.gds /home/csobey/MSSS/correct.parset /home/hassall/MSSS/dummy.model `pwd` > log/calibrate_image_${num}.txt
-    calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres --instrument-db ${cal}/instrument ${source}.gds ../correct.parset /home/hassall/MSSS/dummy.model `pwd` > log/calibrate_image_${num}.txt
+    echo "Calibrating TARGET..."
+    calibrate -f --key ${key}-${num} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres --instrument-db ${cal}/instrument ${source}.gds ../correct.parset /home/hassall/MSSS/dummy.model `pwd` > log/calibrate_image_${num}.txt
 
     echo "Finished subband" ${num} `date`
 }
