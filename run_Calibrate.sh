@@ -108,7 +108,7 @@ calibrate-stand-alone -f ${combined} ../phaseonly.parset ${skyModel} > log/calib
 
 echo "Finished phase-only calibration" `date`
 mv SB*.pdf plots
-mv calibrate-stand-alone*log logs
+mv calibrate-stand-alone*log log
 
 echo "Flagging bad stations... " `date`
 # Shamelessly stolen from Sobey & Cendes...
