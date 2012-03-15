@@ -109,4 +109,15 @@ calibrate-stand-alone -f ${combined} ../phaseonly.parset ${skyModel} > log/calib
 echo "Finished phase-only calibration" `date`
 mv SB*.pdf plots
 mv calibrate-stand-alone*log logs
+
+echo "Flagging bad stations... " `date`
+# Shamelessly stolen from Sobey & Cendes...
+table=`echo ${combined} | awk -F_ '{print $1}'`
+#echo $MS ${table}".tab"
+PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/software/ledama/ExecuteLModule ASCIIStats -i ${combined} -r ./
+PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/plotting/statsplot.py -i `pwd`/${combined}.stats -o $table
+flag=`cat ${table}.tab | awk -vORS='' '{if ($0 ~/True/) print ";""!"$2}' | awk '{print substr($0,2)}'`
+echo "flagging " $flag
+msselect in=${combined} out=${combined}.flag baseline=${flag} deep=true || error "msselect failed"
+
 echo "run_Calibrate.sh Finished" `date`
