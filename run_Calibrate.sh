@@ -1,24 +1,29 @@
-#!/bin/sh
+#!/bin/bash
 obs_id=$1
 beam=$2
 band=$3
-key=$4
-skyModel=$5
-calModel=$6
+skyModel=$4
+calModel=$5
 if [ "${beam}" = 0 ]; then
     targ_band=0`echo $band | bc`
     cal_band=`echo $band+16 | bc`
-else
-    if [ "${beam}" =  1 ]; then
-        targ_band=`echo $band+8 | bc`
+elif [ "${beam}" =  1 ]; then
+    targ_band=`echo $band+8 | bc`
     cal_band=`echo $band+16 | bc`
-
-    fi
 fi
+
+COLOR_RED_BOLD=`tput setaf 1 && tput bold`
+COLOR_NONE=`tput sgr0`
+
+error()
+{
+    echo ${COLOR_RED_BOLD}[ERROR]${COLOR_NONE} ${1} failed.
+    exit 1
+}
 
 combined=${obs_id}_SAP00${beam}_BAND${band}.MS
 
-echo "Starting run_Calibrate.csh" `date`
+echo "Starting run_Calibrate.sh" `date`
 
 #uncomment to move data to your working area
 #echo "Gathering data..." `date`
@@ -43,33 +48,37 @@ fi
 test -d log || mkdir log
 test -d plots || mkdir plots
 
+# We'll need these sourcedbs a number of times, so might as well build them
+# once and reuse.
+echo "Building calibrator sourcedb..."
+test -d sky.calibrator && rm -rf sky.calibrator
+makesourcedb in=${calModel} out=sky.calibrator format='<' || error makesourcedb
+
+echo "Building dummy sourcedb..."
+test -d sky.dummy && rm -rf sky.dummy
+makesourcedb in=/home/hassall/MSSS/dummy.model out=sky.dummy format='<' || error makesourcedb
+
 process_subband() {
     num=${1}
     echo "Starting work on subband" $num `date`
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
 
-    makevds ~pizzo/cep2.clusterdesc ${source}
-    makevds ~pizzo/cep2.clusterdesc ${cal}
-    combinevds ${source}.gds ${source}.vds
-    combinevds ${cal}.gds ${cal}.vds
-
-    echo "Calibrating CALIBRATOR..."
-    calibrate -f --key ${key}-${num} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${cal}.gds ../cal.parset ${calModel} `pwd` > log/calibrate_cal_${num}.txt
+    echo "Calibrating ${cal}..."
+    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ../cal.parset ${calModel} > log/calibrate_cal_${num}.txt || error "calibration of calibrator field"
 
     echo "Zapping suspect points..."
-    ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/
+    ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/ > log/edit_parmdb_${num}.txt || error edit_parmdb
 
     echo "Making diagnostic plots..."
-    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/
+    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/ || error solplot
 
-    echo "Calibrating TARGET..."
-    calibrate -f --key ${key}-${num} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres --instrument-db ${cal}/instrument ${source}.gds ../correct.parset /home/hassall/MSSS/dummy.model `pwd` > log/calibrate_image_${num}.txt
-
+    echo "Calibrating ${source}..."
+    calibrate-stand-alone --sourcedb sky.dummy --parmdb ${cal}/instrument ${source} ../correct.parset /home/hassall/MSSS/dummy.model > log/calibrate_transfer_${num}.txt || error "solution transfer"
     echo "Finished subband" ${num} `date`
 }
 
-for num in `seq 0 9`; do
+for num in {0..9} ; do
     process_subband $num &
 done
 wait
@@ -84,23 +93,17 @@ echo "" >> NDPPP.parset
 
 echo "Starting work on combined subbands" `date`
 echo "Combining Subbands..."
-NDPPP NDPPP.parset
-
-echo "Making FINAL vds"
-makevds ~pizzo/cep2.clusterdesc ${combined}
-echo "Combining FINAL vds"
-combinevds ${combined}.gds ${combined}.vds
+NDPPP NDPPP.parset || error NDPPP
 
 echo "rficonsole..."
 echo "Removing RFI... " `date`
-rficonsole -indirect-read ${combined}
+rficonsole -indirect-read ${combined} || error rficonsole
 
-echo "Calibrating FINAL IMAGE"
+echo "Calibrating ${combined}"
 echo "Starting phase-only calibration" `date`
-calibrate -f --key ${key} --cluster-desc ~pizzo/cep2.clusterdesc --db ldb002 --db-user postgres ${combined}.gds ../phaseonly.parset ${skyModel} `pwd` >log/calibrate_final_image2.txt
+calibrate-stand-alone -f ${combined} ../phaseonly.parset ${skyModel} > log/calibrate_phaseonly.txt || error "phase-only calibration"
 
 echo "Finished phase-only calibration" `date`
-echo "run_Calibrate.csh Finished" `date`
-mv ${key}* log/
 mv SB*.pdf plots
-
+mv calibrate-stand-alone*log logs
+echo "run_Calibrate.sh Finished" `date`
