@@ -80,8 +80,11 @@ process_subband() {
 
 for num in {0..9} ; do
     process_subband $num &
+    child_pids[num]=$!
 done
-wait
+for pid in ${child_pids[*]}; do
+    wait $pid || error "processing subband failed"
+done
 
 echo "msin=[${obs_id}_SAP00${beam}_SB${targ_band}"`seq -s "_target_sub.MS.dppp, ${obs_id}_SAP00${beam}_SB${targ_band}" 0 9`"_target_sub.MS.dppp]"> NDPPP.parset
 echo "msin.missingdata=true" >> NDPPP.parset
