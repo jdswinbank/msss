@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Based on code originally written by Tom Hassall
+# Extensively modified by John Swinbank
+# Bug reports, patches etc to <swinbank@transientskp.org>
+
 # Default values; can be overriden on command line
 CAL_PARSET=../cal.parset
 CORRECT_PARSET=../correct.parset
@@ -7,18 +11,19 @@ PHASE_PARSET=../phaseonly.parset
 DUMMY_MODEL=/home/hassall/MSSS/dummy.model
 
 usage() {
-    echo -e "Usage:\n"
+    echo -e "Usage:"
     echo -e "    ${0} [options] <obs_id> <beam> <band> <skyModel> <calModel> \n"
-    echo -e "Valid options:\n"
+    echo -e "Valid options:"
     echo -e "    -a   Parset for calibration of calibrator (default: ${CAL_PARSET})"
     echo -e "    -o   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
     echo -e "    -p   Parset for phase-only calibration of target (default: ${PHASE_PARSET})"
-    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})\n"
-    echo -e "Example:\n"
+    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})"
+    echo -e "    -h   Display this message\n"
+    echo -e "Example:"
     echo -e "    ${0} L42025 0 06 ~rowlinson/msss/201203/sky.model ~rowlinson/msss/201203/3c295.model"
 }
 
-while getopts ":a:o:p:d:" opt; do
+while getopts ":a:o:p:d:h" opt; do
     case $opt in
         a)
             CAL_PARSET=${OPTARG}
@@ -31,6 +36,10 @@ while getopts ":a:o:p:d:" opt; do
             ;;
         d)
             DUMMY_MODEL=${OPTARG}
+            ;;
+        h)
+            usage
+            exit 0
             ;;
         \?)
             echo -e "Invalid option: -${OPTARG}\n"
