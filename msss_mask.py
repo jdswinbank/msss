@@ -10,6 +10,7 @@
 # Edited by JDS, 2012-03-16:
 # * Properly convert maj/minor axes to half length
 # * Handle empty fields in sky model by setting them to 0
+# * Fix off-by-one error at mask boundary
 #
 # FIXED BUG
 # * if a source is outside the mask, the script ignores it
@@ -168,7 +169,7 @@ for source in data:
     for x in xrange(xmin, xmax):
         for y in xrange(ymin, ymax):
             # skip pixels outside the mask field
-            if x > xlen or y > ylen or x < 0 or y < 0: continue
+            if x >= xlen or y >= ylen or x < 0 or y < 0: continue
             # get pixel ra and dec in rad
             null, null, pix_dec, pix_ra = mask.toworld([0,0,y,x])
 
