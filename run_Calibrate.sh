@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 obs_id=$1
 beam=$2
 band=$3

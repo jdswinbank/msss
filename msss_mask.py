@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # fill a mask based on skymodel
 # Usage: ./msss_mask.py mask-file skymodel
