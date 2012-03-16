@@ -9,6 +9,7 @@
 #
 # Edited by JDS, 2012-03-16:
 # * Properly convert maj/minor axes to half length
+# * Handle empty fields in sky model by setting them to 0
 #
 # FIXED BUG
 # * if a source is outside the mask, the script ignores it
@@ -94,14 +95,15 @@ def read_header(catalogue):
         elif h == "MajorAxis":
             names.append('maj')
             formats.append(np.float) # fwhm -> radius
-            converters[i] = lambda x: np.float(x)/2
+            converters[i] = lambda x: np.float(x)/2 if x else 0.0
         elif h == "MinorAxis":
             names.append('min')
             formats.append(np.float) # fwhm -> radius
-            converters[i] = lambda x: np.float(x)/2
+            converters[i] = lambda x: np.float(x)/2 if x else 0.0
         elif h == "Orientation":
             names.append('pa')
             formats.append(np.float)
+            converters[i] = lambda x: np.float(x) if x else 0.0
         else:
             names.append(h)
             formats.append('S100')
