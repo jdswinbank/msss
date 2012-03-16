@@ -116,7 +116,6 @@ catalogue = sys.argv[2]
 names, formats, converters = read_header(catalogue)
 types = np.dtype({'names':names,'formats':formats})
 data = np.loadtxt(catalogue, comments='format', unpack=True, dtype=types, delimiter=',', converters=converters)
-print data
 
 # read mask
 mask = pi.image(mask_file, overwrite=True)
