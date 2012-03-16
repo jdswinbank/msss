@@ -40,6 +40,6 @@ if __name__ == "__main__":
         print parse_skymodel(calculate_limit)
     except Exception, e:
         print "taper.py -- Applies Gaussian taper to skymodel\n"
-        print "Usage: taper.py [flux_limit] [fwhm] [ra] [dec] < [input] > [output]"
+        print "Usage: taper.py <flux_limit> <fwhm> <ra> <dec> < [input] > [output]"
         print "Reads input sky model from stdin, outputs to stdout.\n"
         print >>sys.stderr, "Error: %s" % (str(e),)

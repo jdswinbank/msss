@@ -1,9 +1,56 @@
 #!/usr/bin/env bash
-obs_id=$1
-beam=$2
-band=$3
-skyModel=$4
-calModel=$5
+
+# Default values; can be overriden on command line
+CAL_PARSET=../cal.parset
+CORRECT_PARSET=../correct.parset
+PHASE_PARSET=../phaseonly.parset
+DUMMY_MODEL=/home/hassall/MSSS/dummy.model
+
+usage() {
+    echo -e "Usage:\n"
+    echo -e "    ${0} [options] <obs_id> <beam> <band> <skyModel> <calModel> \n"
+    echo -e "Valid options:\n"
+    echo -e "    -a   Parset for calibration of calibrator (default: ${CAL_PARSET})"
+    echo -e "    -o   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
+    echo -e "    -p   Parset for phase-only calibration of target (default: ${PHASE_PARSET})"
+    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})\n"
+    echo -e "Example:\n"
+    echo -e "    ${0} L42025 0 06 ~rowlinson/msss/201203/sky.model ~rowlinson/msss/201203/3c295.model"
+}
+
+while getopts ":a:o:p:d:" opt; do
+    case $opt in
+        a)
+            CAL_PARSET=${OPTARG}
+            ;;
+        o)
+            CORRECT_PARSET=${OPTARG}
+            ;;
+        p)
+            PHASE_PARSET=${OPTARG}
+            ;;
+        d)
+            DUMMY_MODEL=${OPTARG}
+            ;;
+        \?)
+            echo -e "Invalid option: -${OPTARG}\n"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# Now read out required positional parameters
+shift $(( OPTIND-1 ))
+if [ $# -ne 5 ]; then
+    usage
+    exit 1
+fi
+obs_id=${1}
+beam=${2}
+band=${3}
+skyModel=${4}
+calModel=${5}
 
 # If anything goes wrong, we'll print a helpful(-ish) messge and exit
 COLOR_RED_BOLD=`tput setaf 1 && tput bold`
@@ -17,6 +64,7 @@ error()
 
 trap error ERR
 
+
 if [ "${beam}" = 0 ]; then
     targ_band=0`echo $band | bc`
     cal_band=`echo $band+16 | bc`
@@ -27,7 +75,7 @@ fi
 
 combined=${obs_id}_SAP00${beam}_BAND${band}.MS
 
-echo "Starting run_Calibrate.sh" `date`
+echo "Starting ${0} at" `date`
 
 #uncomment to move data to your working area
 #echo "Gathering data..." `date`
@@ -60,7 +108,7 @@ makesourcedb in=${calModel} out=sky.calibrator format='<'
 
 echo "Building dummy sourcedb..."
 test -d sky.dummy && rm -rf sky.dummy
-makesourcedb in=/home/hassall/MSSS/dummy.model out=sky.dummy format='<'
+makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<'
 
 process_subband() {
     num=${1}
@@ -70,7 +118,7 @@ process_subband() {
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
 
     echo "Calibrating ${cal}..."
-    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ../cal.parset ${calModel} > log/calibrate_cal_${num}.txt
+    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${calModel} > log/calibrate_cal_${num}.txt
 
     echo "Zapping suspect points for SB${cal_band}${num}..."
     ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/ > log/edit_parmdb_${num}.txt 2>&1
@@ -79,7 +127,7 @@ process_subband() {
     ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/
 
     echo "Calibrating ${source}..."
-    calibrate-stand-alone --sourcedb sky.dummy --parmdb ${cal}/instrument ${source} ../correct.parset /home/hassall/MSSS/dummy.model > log/calibrate_transfer_${num}.txt
+    calibrate-stand-alone --sourcedb sky.dummy --parmdb ${cal}/instrument ${source} ${CORRECT_PARSET} /home/hassall/MSSS/dummy.model > log/calibrate_transfer_${num}.txt
     echo "Finished subband" ${num} `date`
 }
 
@@ -109,7 +157,7 @@ rficonsole -indirect-read ${combined}
 
 echo "Calibrating ${combined}"
 echo "Starting phase-only calibration" `date`
-calibrate-stand-alone -f ${combined} ../phaseonly.parset ${skyModel} > log/calibrate_phaseonly.txt
+calibrate-stand-alone -f ${combined} ${PHASE_PARSET} ${skyModel} > log/calibrate_phaseonly.txt
 
 echo "Finished phase-only calibration" `date`
 mv SB*.pdf plots
@@ -125,4 +173,4 @@ flag=`cat ${table}.tab | awk -vORS='' '{if ($0 ~/True/) print ";""!"$2}' | awk '
 echo "flagging " $flag
 msselect in=${combined} out=${combined}.flag baseline=${flag} deep=true
 
-echo "run_Calibrate.sh Finished" `date`
+echo "${0} finished at" `date`
