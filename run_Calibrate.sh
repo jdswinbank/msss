@@ -4,6 +4,19 @@ beam=$2
 band=$3
 skyModel=$4
 calModel=$5
+
+# If anything goes wrong, we'll print a helpful(-ish) messge and exit
+COLOR_RED_BOLD=`tput setaf 1 && tput bold`
+COLOR_NONE=`tput sgr0`
+
+error()
+{
+    echo ${COLOR_RED_BOLD}[ERROR]${COLOR_NONE} ${BASH_COMMAND} failed.
+    exit 1
+}
+
+trap error ERR
+
 if [ "${beam}" = 0 ]; then
     targ_band=0`echo $band | bc`
     cal_band=`echo $band+16 | bc`
@@ -11,15 +24,6 @@ elif [ "${beam}" =  1 ]; then
     targ_band=`echo $band+8 | bc`
     cal_band=`echo $band+16 | bc`
 fi
-
-COLOR_RED_BOLD=`tput setaf 1 && tput bold`
-COLOR_NONE=`tput sgr0`
-
-error()
-{
-    echo ${COLOR_RED_BOLD}[ERROR]${COLOR_NONE} ${1} failed.
-    exit 1
-}
 
 combined=${obs_id}_SAP00${beam}_BAND${band}.MS
 
@@ -52,11 +56,11 @@ test -d plots || mkdir plots
 # once and reuse.
 echo "Building calibrator sourcedb..."
 test -d sky.calibrator && rm -rf sky.calibrator
-makesourcedb in=${calModel} out=sky.calibrator format='<' || error makesourcedb
+makesourcedb in=${calModel} out=sky.calibrator format='<'
 
 echo "Building dummy sourcedb..."
 test -d sky.dummy && rm -rf sky.dummy
-makesourcedb in=/home/hassall/MSSS/dummy.model out=sky.dummy format='<' || error makesourcedb
+makesourcedb in=/home/hassall/MSSS/dummy.model out=sky.dummy format='<'
 
 process_subband() {
     num=${1}
@@ -65,16 +69,16 @@ process_subband() {
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
 
     echo "Calibrating ${cal}..."
-    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ../cal.parset ${calModel} > log/calibrate_cal_${num}.txt || error "calibration of calibrator field"
+    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ../cal.parset ${calModel} > log/calibrate_cal_${num}.txt
 
-    echo "Zapping suspect points..."
-    ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/ > log/edit_parmdb_${num}.txt || error edit_parmdb
+    echo "Zapping suspect points for SB${cal_band}${num}..."
+    ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/ > log/edit_parmdb_${num}.txt 2>&1
 
-    echo "Making diagnostic plots..."
-    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/ || error solplot
+    echo "Making diagnostic plots for SB${cal_band}${num}..."
+    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/
 
     echo "Calibrating ${source}..."
-    calibrate-stand-alone --sourcedb sky.dummy --parmdb ${cal}/instrument ${source} ../correct.parset /home/hassall/MSSS/dummy.model > log/calibrate_transfer_${num}.txt || error "solution transfer"
+    calibrate-stand-alone --sourcedb sky.dummy --parmdb ${cal}/instrument ${source} ../correct.parset /home/hassall/MSSS/dummy.model > log/calibrate_transfer_${num}.txt
     echo "Finished subband" ${num} `date`
 }
 
@@ -83,7 +87,7 @@ for num in {0..9} ; do
     child_pids[num]=$!
 done
 for pid in ${child_pids[*]}; do
-    wait $pid || error "processing subband failed"
+    wait $pid
 done
 
 echo "msin=[${obs_id}_SAP00${beam}_SB${targ_band}"`seq -s "_target_sub.MS.dppp, ${obs_id}_SAP00${beam}_SB${targ_band}" 0 9`"_target_sub.MS.dppp]"> NDPPP.parset
@@ -96,15 +100,15 @@ echo "" >> NDPPP.parset
 
 echo "Starting work on combined subbands" `date`
 echo "Combining Subbands..."
-NDPPP NDPPP.parset || error NDPPP
+NDPPP NDPPP.parset
 
 echo "rficonsole..."
 echo "Removing RFI... " `date`
-rficonsole -indirect-read ${combined} || error rficonsole
+rficonsole -indirect-read ${combined}
 
 echo "Calibrating ${combined}"
 echo "Starting phase-only calibration" `date`
-calibrate-stand-alone -f ${combined} ../phaseonly.parset ${skyModel} > log/calibrate_phaseonly.txt || error "phase-only calibration"
+calibrate-stand-alone -f ${combined} ../phaseonly.parset ${skyModel} > log/calibrate_phaseonly.txt
 
 echo "Finished phase-only calibration" `date`
 mv SB*.pdf plots
@@ -118,6 +122,6 @@ PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/software/ledama/Execute
 PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/plotting/statsplot.py -i `pwd`/${combined}.stats -o $table
 flag=`cat ${table}.tab | awk -vORS='' '{if ($0 ~/True/) print ";""!"$2}' | awk '{print substr($0,2)}'`
 echo "flagging " $flag
-msselect in=${combined} out=${combined}.flag baseline=${flag} deep=true || error "msselect failed"
+msselect in=${combined} out=${combined}.flag baseline=${flag} deep=true
 
 echo "run_Calibrate.sh Finished" `date`
