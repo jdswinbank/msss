@@ -64,6 +64,7 @@ makesourcedb in=/home/hassall/MSSS/dummy.model out=sky.dummy format='<'
 
 process_subband() {
     num=${1}
+    trap error ERR # Enable error handler in subshell
     echo "Starting work on subband" $num `date`
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
