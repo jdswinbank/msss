@@ -11,6 +11,7 @@ PHASE_PARSET=phaseonly.parset
 DUMMY_MODEL=/home/hassall/MSSS/dummy.model
 CLOBBER=FALSE
 AUTO_FLAG_STATIONS=FALSE
+COLLECT=FALSE
 declare -a BAD_STATION_LIST
 ctr=0 # length of BAD_STATION_LIST
 
@@ -25,8 +26,9 @@ usage() {
     echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})"
     echo -e "    -s   Flag a specific station in the output\n"
     echo -e "Options which take no argument:"
-    echo -e "    -c   Overwrite output file if it already exists"
+    echo -e "    -c   Collect data prior to processing"
     echo -e "    -f   Automatically identify & flag bad stations"
+    echo -e "    -w   Overwrite output file if it already exists"
     echo -e "    -h   Display this message\n"
     echo -e "Example:"
     echo -e "    ${0} L42025 0 06 ~rowlinson/msss/201203/sky.model ~rowlinson/msss/201203/3c295.model"
@@ -50,6 +52,9 @@ while getopts ":o:a:g:p:d:s:cfh" opt; do
             DUMMY_MODEL=${OPTARG}
             ;;
         c)
+            COLLECT=TRUE
+            ;;
+        w)
             CLOBBER=TRUE
             ;;
         f)
@@ -92,8 +97,6 @@ error()
     exit 1
 }
 
-trap error ERR
-
 echo "Starting ${0} at" `date`
 
 if [ "${beam}" = 0 ]; then
@@ -104,16 +107,16 @@ elif [ "${beam}" =  1 ]; then
     cal_band=`echo $band+16 | bc`
 fi
 
+if [ ${COLLECT} = "TRUE" ]; then
+    echo "Collecting data..." `date`
+    for node in `seq -w 1 100`; do
+        echo locus$node
+    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* .
+    echo "scp-ing done!" `date`
+fi
 
-
-#uncomment to move data to your working area
-#echo "Gathering data..." `date`
-#for node in `seq -w 1 100`; do
-#    echo $node
-#    scp -r locus$node:/data/scratch/pipeline/${obs_id}*/*SB${band}*_target_sub* .
-#    scp -r locus$node:/data/scratch/pipeline/${obs_id}*/*SB${cal_band}*_target_sub* .
-#done
-#echo "scp-ing done!" `date`
+# From this point on, any failures are fatal
+trap error ERR
 
 #for file in *MS.dppp; do
 #    echo rficonsole -indirect-read $file
