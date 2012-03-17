@@ -169,7 +169,10 @@ actually process multiple observations in parallel::
     dir 0 06 ../sky.model ../cal.model'
 
 Phew! That is, admittedly, something of a mouthful, but your data will likely
-be processed by the time you've got yourself a cup of coffee.
+be processed by the time you've got yourself a cup of coffee. Note that we
+limit the above to processing only 4 snapshots at a time: that should still be
+plenty to saturate a compute node. You an adjust the number of snapshots
+processed simultaneously by changing the ``-P4`` parameter.
 
 
 Extra: Problems with X11 forwarding
@@ -191,3 +194,6 @@ option to ``596h`` when running SSH *on your Mac*. For example::
 You may wish to add this to your ``~/.ssh/config`` file to avoid typing it
 every time -- figuring out the relevant syntax is left as an exercise for the
 reader!
+
+You might also have some luck by using "trusted" X11 forwarding. Enable this
+by using ``-Y`` in the place of ``-X`` in your SSH command line.
