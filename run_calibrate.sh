@@ -22,8 +22,8 @@ usage() {
     echo -e "    -a   Parset for calibration of calibrator (default: ${CAL_PARSET})"
     echo -e "    -g   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
     echo -e "    -p   Parset for phase-only calibration of target (default: ${PHASE_PARSET})"
-    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})\n"
-    echo -e "    -s   Flag a specific station in the output"
+    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})"
+    echo -e "    -s   Flag a specific station in the output\n"
     echo -e "Options which take no argument:"
     echo -e "    -c   Overwrite output file if it already exists"
     echo -e "    -f   Automatically identify & flag bad stations"
@@ -94,6 +94,7 @@ error()
 
 trap error ERR
 
+echo "Starting ${0} at" `date`
 
 if [ "${beam}" = 0 ]; then
     targ_band=0`echo $band | bc`
@@ -103,9 +104,7 @@ elif [ "${beam}" =  1 ]; then
     cal_band=`echo $band+16 | bc`
 fi
 
-combined=${obs_id}_SAP00${beam}_BAND${band}.MS
 
-echo "Starting ${0} at" `date`
 
 #uncomment to move data to your working area
 #echo "Gathering data..." `date`
@@ -122,6 +121,11 @@ echo "Starting ${0} at" `date`
 #done
 #exit
 
+combined=${obs_id}_SAP00${beam}_BAND${band}.MS
+if [ ! ${OUTPUT_NAME} ]; then
+    OUTPUT_NAME=${combined}.flag
+fi
+
 if [ -d ${OUTPUT_NAME} ]; then
     if [ ${CLOBBER} = "TRUE" ]; then
         echo "Removing ${OUTPUT_NAME}"
@@ -136,8 +140,6 @@ if [ -d ${combined} ]; then
     echo "Removing ${combined}"
     rm -rf ${combined}
 fi
-
-if [ -d $
 
 test -d log || mkdir log
 test -d plots || mkdir plots
@@ -214,11 +216,8 @@ if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
     done
 fi
 
-if [ ! ${OUTPUT_NAME} ]; then
-    OUTPUT_NAME=${combined}.flag
-fi
-
 if [ ${BAD_STATION_LIST} ]; then
+    echo "Flagging stations: ${BAD_STATION_LIST[*]}"
     FILTER=`echo "!${BAD_STATION_LIST[*]}" | sed -e's/ /;!/g'`
 else
     FILTER=""
