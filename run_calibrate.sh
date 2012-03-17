@@ -5,32 +5,42 @@
 # Bug reports, patches etc to <swinbank@transientskp.org>
 
 # Default values; can be overriden on command line
-CAL_PARSET=../cal.parset
-CORRECT_PARSET=../correct.parset
-PHASE_PARSET=../phaseonly.parset
+CAL_PARSET=cal.parset
+CORRECT_PARSET=correct.parset
+PHASE_PARSET=phaseonly.parset
 DUMMY_MODEL=/home/hassall/MSSS/dummy.model
-FLAG_BAD_STATIONS=FALSE
+CLOBBER=FALSE
+AUTO_FLAG_STATIONS=FALSE
+declare -a BAD_STATION_LIST
+ctr=0 # length of BAD_STATION_LIST
 
 usage() {
     echo -e "Usage:"
     echo -e "    ${0} [options] <obs_id> <beam> <band> <skyModel> <calModel> \n"
-    echo -e "Valid options:"
+    echo -e "Options with string arguments:"
+    echo -e '    -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS.flag)'
     echo -e "    -a   Parset for calibration of calibrator (default: ${CAL_PARSET})"
-    echo -e "    -o   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
+    echo -e "    -g   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
     echo -e "    -p   Parset for phase-only calibration of target (default: ${PHASE_PARSET})"
-    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})"
-    echo -e "    -f   Identify & flag bad stations (default: ${FLAG_BAD_STATIONS})"
+    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})\n"
+    echo -e "    -s   Flag a specific station in the output"
+    echo -e "Options which take no argument:"
+    echo -e "    -c   Overwrite output file if it already exists"
+    echo -e "    -f   Automatically identify & flag bad stations"
     echo -e "    -h   Display this message\n"
     echo -e "Example:"
     echo -e "    ${0} L42025 0 06 ~rowlinson/msss/201203/sky.model ~rowlinson/msss/201203/3c295.model"
 }
 
-while getopts ":a:o:p:d:fh" opt; do
+while getopts ":o:a:g:p:d:s:cfh" opt; do
     case $opt in
+        o)
+            OUTPUT_NAME=${OPTARG}
+            ;;
         a)
             CAL_PARSET=${OPTARG}
             ;;
-        o)
+        g)
             CORRECT_PARSET=${OPTARG}
             ;;
         p)
@@ -39,8 +49,14 @@ while getopts ":a:o:p:d:fh" opt; do
         d)
             DUMMY_MODEL=${OPTARG}
             ;;
+        c)
+            CLOBBER=TRUE
+            ;;
         f)
-            FLAG_BAD_STATIONS=TRUE
+            AUTO_FLAG_STATIONS=TRUE
+            ;;
+        s)
+            BAD_STATION_LIST[$((ctr++))]=${OPTARG}
             ;;
         h)
             usage
@@ -106,10 +122,22 @@ echo "Starting ${0} at" `date`
 #done
 #exit
 
+if [ -d ${OUTPUT_NAME} ]; then
+    if [ ${CLOBBER} = "TRUE" ]; then
+        echo "Removing ${OUTPUT_NAME}"
+        rm -rf ${OUTPUT_NAME}
+    else
+        echo "${OUTPUT_NAME} already exists; aborting"
+        exit 1
+    fi
+fi
+
 if [ -d ${combined} ]; then
     echo "Removing ${combined}"
     rm -rf ${combined}
 fi
+
+if [ -d $
 
 test -d log || mkdir log
 test -d plots || mkdir plots
@@ -177,16 +205,26 @@ echo "Finished phase-only calibration" `date`
 mv SB*.pdf plots
 mv calibrate-stand-alone*log log
 
-if [ ${FLAG_BAD_STATIONS} = "TRUE" ]; then
-    # Shamelessly stolen from Sobey & Cendes.
+if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
     echo "Flagging bad stations... " `date`
-    table=`echo ${combined} | awk -F_ '{print $1}'`
-    #echo $MS ${table}".tab"
     PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/software/ledama/ExecuteLModule ASCIIStats -i ${combined} -r ./
-    PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/plotting/statsplot.py -i `pwd`/${combined}.stats -o $table
-    flag=`cat ${table}.tab | awk -vORS='' '{if ($0 ~/True/) print ";""!"$2}' | awk '{print substr($0,2)}'`
-    echo "flagging " $flag
-    msselect in=${combined} out=${combined}.flag baseline=${flag} deep=true
+    PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/plotting/statsplot.py -i `pwd`/${combined}.stats -o ${obs_id}
+    for station in `grep True$ ${obs_id}.tab | cut -f2`; do
+        BAD_STATION_LIST[$((ctr++))]=${station}
+    done
 fi
 
+if [ ! ${OUTPUT_NAME} ]; then
+    OUTPUT_NAME=${combined}.flag
+fi
+
+if [ ${BAD_STATION_LIST} ]; then
+    FILTER=`echo "!${BAD_STATION_LIST[*]}" | sed -e's/ /;!/g'`
+else
+    FILTER=""
+fi
+
+msselect in=${combined} out=${OUTPUT_NAME} baseline=${FILTER} deep=True
+
+echo "Data written to ${OUTPUT_NAME}."
 echo "${0} finished at" `date`
