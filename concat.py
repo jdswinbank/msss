@@ -9,4 +9,4 @@ if __name__ == "__main__":
         t = table(sys.argv[2:])
         t.sort('TIME').copy(sys.argv[1], deep = True)
     except:
-        print "Usage: concat.py [output.MS] [input.MS] <input.MS> ..."
+        print "Usage: concat.py <output.MS> <input.MS> [input.MS] ..."

@@ -52,7 +52,7 @@ another tool of your choice.
 ``~swinbank/msss/run_calibrate.sh``. Running it with no arguments will produce
 a usage message::
 
-  $ ~swinbank//msss/run_calibrate.sh
+  $ ~swinbank/msss/run_calibrate.sh
   Usage:
       /home/swinbank/msss/run_calibrate.sh [options] <obs_id> <beam> <band> <skyModel> <calModel>
 
@@ -63,11 +63,13 @@ a usage message::
       -p   Parset for phase-only calibration of target (default: phaseonly.parset)
       -d   Dummy sky model for use in applying gains (default: /home/hassall/MSSS/dummy.model)
       -s   Flag a specific station in the output
+
   Options which take no argument:
       -c   Collect data prior to processing
       -f   Automatically identify & flag bad stations
       -w   Overwrite output file if it already exists
       -h   Display this message
+
   Example:
       /home/swinbank/msss/run_calibrate.sh L42025 0 06 sky.model 3c295.model
 
@@ -174,6 +176,78 @@ limit the above to processing only 4 snapshots at a time: that should still be
 plenty to saturate a compute node. You an adjust the number of snapshots
 processed simultaneously by changing the ``-P4`` parameter.
 
+Concatenating snapshots
++++++++++++++++++++++++
+
+Of course, you can now go ahead and image each of those snapshots
+independently. However, you may well find it desirable to concatenate them
+together and image them as one unit. You can do this concatenation yourself
+(but note that `Bonafede & Macario
+<http://www.lofar.org/operations/lib/exe/fetch.php?media=msss:bonafede_macario_w10.pdf>`_
+warn against using ``casapy``), but a simple script is available to make your
+life even easier::
+
+  $ ~swinbank/msss/concat.py <output.MS> <input1.MS> ... [inputN.MS]
+
+You must specify an output MeasurementSet (which will be created for you) and
+at least one input. Following our example above, we could write::
+
+  $ ~swinbank/msss/concat.py final.MS L4*/*MS.flag
+
+To concatenate all the snapshots we have calibrated. You can then go ahead and
+image ``final.MS`` using ``casapy``, ``awimager``, etc.
+
+Timing
+++++++
+
+Processing all nine snapshots targeting L227+69 (L41961, L41969, L41977,
+L41985, L41993, L42001, L42009, L42017 and L42025) through `run_calibrate.sh`,
+including collecting all the data (``-c``) and automatically identifying bad
+stations (``-f``) took a wall-clock time of 14 minutes 20 seconds. The total
+CPU time, real+user, was nearer 106 minutes, thus demonstrating the advantages
+of parallelization! Note that the processing time can be heavily dependent on
+the BBS configuration used, in particular the complexity of the sky model used
+when performing the phase-only calibration step.
+
+Concatenating the results of all nine snapshots took a further 20 seconds.
+
+Testimonials
+++++++++++++
+
+"I should really try using that script" -- Jess Broderick
+
+Tapering skymodels
+------------------
+
+Another script which may be of interest is ``~swinbank/msss/taper.py``. It
+enables you to easily apply a Gaussian taper to a sky model, so that (for
+example) at the centre of your image the model includes all sources, however
+fait, but around the edges only the brightest sources are included. It is run
+as follows::
+
+  $ ~swinbank/msss/taper.py
+  taper.py -- Applies Gaussian taper to skymodel
+
+  Usage: taper.py <flux_limit> <fwhm> <ra> <dec> < [input] > [output]
+  Reads input sky model from stdin, outputs to stdout.
+
+You must supply four positional arguments. ``flux_limit`` specifies the
+minimum flux which will be included at the edge of the taper: note that *all*
+sources at the centre will be included). ``fwhm`` specifies the full-width at
+half-maximum of the tapering. ``ra`` and ``dec`` specify the position of the
+centre of the tapering function: these can be supplied in any format which is
+understood by ``casacore`` (so you can, for example, copy and paste from your
+skymodel file).
+
+Input is read from standard input, and the result is written to standard out.
+You can therefore use the redirection facilities in your shell (``<`` and
+``>``) to arrange for the tapered model to be saved to an appropriate
+location.
+
+Testimonials
+++++++++++++
+
+"It works, but it didn't make much difference to the RMS" -- Antonia Rowlinson
 
 Extra: Problems with X11 forwarding
 -----------------------------------
