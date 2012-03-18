@@ -31,10 +31,10 @@ usage() {
     echo -e "    -w   Overwrite output file if it already exists"
     echo -e "    -h   Display this message\n"
     echo -e "Example:"
-    echo -e "    ${0} L42025 0 06 ~rowlinson/msss/201203/sky.model ~rowlinson/msss/201203/3c295.model"
+    echo -e "    ${0} L42025 0 06 sky.model 3c295.model"
 }
 
-while getopts ":o:a:g:p:d:s:cfh" opt; do
+while getopts ":o:a:g:p:d:s:cfhw" opt; do
     case $opt in
         o)
             OUTPUT_NAME=${OPTARG}
