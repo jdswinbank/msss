@@ -1,6 +1,9 @@
 =========================================
 Techniques for quick MSSS data processing
 =========================================
+-------------------------
+John Swinbank, March 2012
+-------------------------
 
 This document describes scripts and techniques which may be used for rapidly
 processing data as part of the ongoing MSSS commissioning effort.
@@ -271,3 +274,10 @@ reader!
 
 You might also have some luck by using "trusted" X11 forwarding. Enable this
 by using ``-Y`` in the place of ``-X`` in your SSH command line.
+
+Finally
+-------
+
+Your contributions, suggestions, bug-fixes, etc to the scripts mentioned in
+this document are, of course, welcomed. Mail me:
+``swinbank@transientskp.org``.
