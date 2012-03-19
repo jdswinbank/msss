@@ -133,7 +133,7 @@ simultaneously.  Assuming you're processing a 10-subband band on a CEP2
 compute node, this is good news: you should see a tenfold speedup relative to
 processing each subband sequentially! If you attempt to use this script to
 process very many subbands, or run on a machine with much more constrainted
-resources than the CEP2 nodes, you might need to rethink this strateghy.
+resources than the CEP2 nodes, you might need to rethink this strategy.
 
 Processing multiple snapshots
 +++++++++++++++++++++++++++++
