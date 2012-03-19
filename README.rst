@@ -103,12 +103,12 @@ may be specified multiple times and the results are cumulative.
 
 If ``-f`` is specified, the script will automatically attempt to identify and
 remove bad stations using the code developed by Martinez and Pandey. It is
-cumulative with ``-s``, above.. For example, on one particular dataset::
+cumulative with ``-s``, above. For example, on one particular dataset::
 
   $ ~swinbank/msss/run_calibrate.sh -s CS001LBA -s CS002LBA -f [...]
 
 causes ``CS001LBA``, ``CS002LBA``, ``CS013LBA``, ``CS030LBA`` and ``CS032LBA``
-all to be removed: the first two because the user specified them, remainder
+all to be removed: the first two because the user specified them, the remainder
 because they were automatically identified as bad. Note that the automatic
 identification of bad stations can be slow: you might wish to specify ``-f``
 on your first run through a given dataset, take note of the stations it
