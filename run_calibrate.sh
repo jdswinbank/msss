@@ -110,6 +110,9 @@ warning()
 
 echo "Starting ${0} at" `date`
 
+test -d log || mkdir log
+test -d plots || mkdir plots
+
 if [ "${beam}" = 0 ]; then
     targ_band=0`echo $band | bc`
     cal_band=`echo $band+16 | bc`
@@ -122,7 +125,7 @@ if [ ${COLLECT} = "TRUE" ]; then
     echo "Collecting data..." `date`
     for node in `seq -w 1 100`; do
         echo locus$node
-    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* .
+    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* . >> log/collect.log 2>&1
     echo "scp-ing done!" `date`
 fi
 
@@ -154,9 +157,6 @@ if [ -d ${combined} ]; then
     echo "Removing ${combined}"
     rm -rf ${combined}
 fi
-
-test -d log || mkdir log
-test -d plots || mkdir plots
 
 # We'll need these sourcedbs a number of times, so might as well build them
 # once and reuse.
