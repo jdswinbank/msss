@@ -10,6 +10,7 @@ CORRECT_PARSET=correct.parset
 PHASE_PARSET=phaseonly.parset
 DUMMY_MODEL=/home/hassall/MSSS/dummy.model
 CLOBBER=FALSE
+ROBUST=FALSE
 AUTO_FLAG_STATIONS=FALSE
 COLLECT=FALSE
 declare -a BAD_STATION_LIST
@@ -27,6 +28,7 @@ usage() {
     echo -e "    -s   Flag a specific station in the output\n"
     echo -e "Options which take no argument:"
     echo -e "    -c   Collect data prior to processing"
+    echo -e "    -r   Robust mode: continue even if some subbands are not available"
     echo -e "    -f   Automatically identify & flag bad stations"
     echo -e "    -w   Overwrite output file if it already exists"
     echo -e "    -h   Display this message\n"
@@ -34,7 +36,7 @@ usage() {
     echo -e "    ${0} L42025 0 06 sky.model 3c295.model"
 }
 
-while getopts ":o:a:g:p:d:s:cfhw" opt; do
+while getopts ":o:a:g:p:d:s:crfhw" opt; do
     case $opt in
         o)
             OUTPUT_NAME=${OPTARG}
@@ -53,6 +55,9 @@ while getopts ":o:a:g:p:d:s:cfhw" opt; do
             ;;
         c)
             COLLECT=TRUE
+            ;;
+        c)
+            ROBUST=TRUE
             ;;
         w)
             CLOBBER=TRUE
@@ -88,13 +93,19 @@ skyModel=${4}
 calModel=${5}
 
 # If anything goes wrong, we'll print a helpful(-ish) messge and exit
-COLOR_RED_BOLD=`tput setaf 1 && tput bold`
-COLOR_NONE=`tput sgr0`
+COLOUR_RED_BOLD=`tput setaf 1 && tput bold`
+COLOUR_YELLOW_BOLD=`tput setaf 3 && tput bold`
+COLOUR_NONE=`tput sgr0`
 
 error()
 {
-    echo ${COLOR_RED_BOLD}[ERROR]${COLOR_NONE} ${BASH_COMMAND} failed.
+    echo ${COLOUR_RED_BOLD}[ERROR]${COLOUR_NONE} ${BASH_COMMAND} failed.
     exit 1
+}
+
+warning()
+{
+    echo ${COLOUR_YELLOW_BOLD}[WARNING]${COLOUR_NONE} ${1}
 }
 
 echo "Starting ${0} at" `date`
@@ -157,12 +168,25 @@ echo "Building dummy sourcedb..."
 test -d sky.dummy && rm -rf sky.dummy
 makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<'
 
+check_for_ms() {
+    if [ ! -d ${1} ]; then
+        warning "%{1} not found"
+        if [ ${ROBUST} = "TRUE" ]; then
+            exit 0
+        else
+            exit 1
+        fi
+    fi
+}
+
 process_subband() {
     num=${1}
     trap error ERR # Enable error handler in subshell
     echo "Starting work on subband" $num `date`
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
+    check_for_ms ${source}
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
+    check_for_ms ${cal}
 
     echo "Calibrating ${cal}..."
     calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${calModel} > log/calibrate_cal_${num}.txt
@@ -178,7 +202,7 @@ process_subband() {
     echo "Finished subband" ${num} `date`
 }
 
-for num in {0..9} ; do
+for num in {0..9}; do
     process_subband $num &
     child_pids[num]=$!
 done
@@ -186,7 +210,17 @@ for pid in ${child_pids[*]}; do
     wait $pid
 done
 
-echo "msin=[${obs_id}_SAP00${beam}_SB${targ_band}"`seq -s "_target_sub.MS.dppp, ${obs_id}_SAP00${beam}_SB${targ_band}" 0 9`"_target_sub.MS.dppp]"> NDPPP.parset
+echo -n "msin=[" > NDPPP.parset
+for num in {0..9}; do
+    ms=${obs_id}_SAP00${beam}_SB${targ_band}${i}_target_sub.MS.dppp
+    if [ -d $ms ]; then
+        echo -n ${ms} >> NDPPP.parset
+    else
+        warning "%{1} not found"
+        test ${ROBUST} = TRUE || exit 1
+    fi
+done
+echo "]" >> NDPPP.parset
 echo "msin.missingdata=true" >> NDPPP.parset
 echo "msin.orderms=false" >> NDPPP.parset
 echo "msin.datacolumn=CORRECTED_DATA" >> NDPPP.parset

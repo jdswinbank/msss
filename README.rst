@@ -69,6 +69,7 @@ a usage message::
 
   Options which take no argument:
       -c   Collect data prior to processing
+      -r   Robust mode: continue even if some subbands are not available
       -f   Automatically identify & flag bad stations
       -w   Overwrite output file if it already exists
       -h   Display this message
@@ -97,6 +98,13 @@ copy it to your current working directory before processing. It is suggested
 that you use this option the first time you run this script, then, once you
 have a copy of the data, you don't need this option again. Until you delete
 it by mistake...
+
+Occasionally, some subbands are not available (because of a problem with the
+observation or with the pre-processing, for example). Normally, this causes a
+fatal error, and ``run_calibrate.sh`` stops. If ``-r`` is specified,
+processing will continnue with whatever subbands are available. *Note* that if
+you specify this option, you must carefully check the log to see which
+subbands have been included!
 
 The ``-s`` option enables you to remove specific stations from the output. It
 may be specified multiple times and the results are cumulative.
