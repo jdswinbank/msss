@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-# Based on code originally written by Tom Hassall
+# Originaly written by Tom Hassall
 # Extensively modified by John Swinbank
+# Updates by George Heald
+#
 # Bug reports, patches etc to <swinbank@transientskp.org>
 
 # Default values; can be overriden on command line
@@ -172,10 +174,8 @@ check_for_ms() {
     if [ ! -d ${1} ]; then
         warning "${1} not found"
         if [ ${ROBUST} = "TRUE" ]; then
-            echo "Robust is true; returning 0"
             exit 0
         else
-            echo "Robust is false; returning 1"
             exit 1
         fi
     fi
@@ -249,8 +249,8 @@ mv calibrate-stand-alone*log log
 
 if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
     echo "Flagging bad stations... " `date`
-    PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/software/ledama/ExecuteLModule ASCIIStats -i ${combined} -r ./
-    PYTHONPATH=$PYTHONPATH:/home/martinez/software ~martinez/plotting/statsplot.py -i `pwd`/${combined}.stats -o ${obs_id}
+    ~martinez/plotting/asciistats.py -i ${combined} -r stats
+    ~martinez/plotting/statsplot.py -i `pwd`/stats/${combined}.stats -o ${obs_id}
     for station in `grep True$ ${obs_id}.tab | cut -f2`; do
         BAD_STATION_LIST[$((ctr++))]=${station}
     done
