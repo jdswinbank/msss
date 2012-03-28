@@ -56,7 +56,7 @@ while getopts ":o:a:g:p:d:s:crfhw" opt; do
         c)
             COLLECT=TRUE
             ;;
-        c)
+        r)
             ROBUST=TRUE
             ;;
         w)
@@ -170,10 +170,12 @@ makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<'
 
 check_for_ms() {
     if [ ! -d ${1} ]; then
-        warning "%{1} not found"
+        warning "${1} not found"
         if [ ${ROBUST} = "TRUE" ]; then
+            echo "Robust is true; returning 0"
             exit 0
         else
+            echo "Robust is false; returning 1"
             exit 1
         fi
     fi
@@ -212,11 +214,12 @@ done
 
 echo -n "msin=[" > NDPPP.parset
 for num in {0..9}; do
-    ms=${obs_id}_SAP00${beam}_SB${targ_band}${i}_target_sub.MS.dppp
-    if [ -d $ms ]; then
-        echo -n ${ms} >> NDPPP.parset
+    ms="${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp"
+    echo ${ms}
+    if [ -d ${ms} ]; then
+        echo -n "${ms}," >> NDPPP.parset
     else
-        warning "%{1} not found"
+        warning "${ms} not found"
         test ${ROBUST} = TRUE || exit 1
     fi
 done
