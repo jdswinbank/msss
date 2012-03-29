@@ -231,6 +231,7 @@ cat >NDPPP.parset <<-EOF
     msin.missingdata=true
     msin.orderms=false
     msin.datacolumn=CORRECTED_DATA
+    msin.baseline=[CR]S*&
     msout=${combined}
     steps=[]
 EOF
