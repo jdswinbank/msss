@@ -16,7 +16,7 @@ ROBUST=FALSE
 AUTO_FLAG_STATIONS=FALSE
 COLLECT=FALSE
 declare -a BAD_STATION_LIST
-ctr=0 # length of BAD_STATION_LIST
+declare -i ctr=0 # length of BAD_STATION_LIST
 
 usage() {
     echo -e "Usage:"
@@ -101,13 +101,18 @@ COLOUR_NONE=`tput sgr0`
 
 error()
 {
-    echo ${COLOUR_RED_BOLD}[ERROR]${COLOUR_NONE} ${BASH_COMMAND} failed.
-    exit 1
+    echo ${COLOUR_RED_BOLD}[ERROR]${COLOUR_NONE} ${1}
 }
 
 warning()
 {
     echo ${COLOUR_YELLOW_BOLD}[WARNING]${COLOUR_NONE} ${1}
+}
+
+failure()
+{
+    error "${BASH_COMMAND} failed"
+    exit 1
 }
 
 echo "Starting ${0} at" `date`
@@ -132,7 +137,7 @@ if [ ${COLLECT} = "TRUE" ]; then
 fi
 
 # From this point on, any failures are fatal
-trap error ERR
+trap failure ERR
 
 #for file in *MS.dppp; do
 #    echo rficonsole -indirect-read $file
@@ -170,25 +175,12 @@ echo "Building dummy sourcedb..."
 test -d sky.dummy && rm -rf sky.dummy
 makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<'
 
-check_for_ms() {
-    if [ ! -d ${1} ]; then
-        warning "${1} not found"
-        if [ ${ROBUST} = "TRUE" ]; then
-            exit 0
-        else
-            exit 1
-        fi
-    fi
-}
-
 process_subband() {
     num=${1}
-    trap error ERR # Enable error handler in subshell
-    echo "Starting work on subband" $num `date`
-    source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
-    check_for_ms ${source}
-    cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
-    check_for_ms ${cal}
+    source=${2}
+    cal=${3}
+    trap failure ERR # Enable error handler in subshell
+    echo "Starting work on " $source `date`
 
     echo "Calibrating ${cal}..."
     calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${calModel} > log/calibrate_cal_${num}.txt
@@ -204,24 +196,35 @@ process_subband() {
     echo "Finished subband" ${num} `date`
 }
 
+declare -a SUBBAND_LIST
+declare -a CALBAND_LIST
+declare -i bandctr=0
 for num in {0..9}; do
-    process_subband $num &
+    # Check if required data exists
+    source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
+    cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
+
+    if [ -d ${source} ] && [ -d ${cal} ];  then
+        SUBBAND_LIST[${bandctr}]=${source}
+        CALBAND_LIST[$((bandctr++))]=${cal}
+    else
+        warning "Target ${source} and/or calibrator ${cal} not found"
+        if [ ${ROBUST} != "TRUE" ]; then
+            error "Missing data"
+            exit 1
+        fi
+    fi
+done
+
+bandctr=0
+for source in ${SUBBAND_LIST[@]}; do
+    process_subband ${bandctr} ${source} ${CALBAND_LIST[$bandctr]} &
+    let bandctr=${bandctr}+1
     child_pids[num]=$!
 done
 for pid in ${child_pids[*]}; do
+    # Wait for all bands to be processed
     wait $pid
-done
-
-declare -a SUBBAND_LIST
-subbandctr=0 # length of SUBBAND_LIST
-for num in {0..9}; do
-    ms="${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp"
-    if [ -d ${ms} ]; then
-        SUBBAND_LIST[$((subbandctr++))]=${ms}
-    else
-        warning "${ms} not found"
-        test ${ROBUST} = TRUE || exit 1
-    fi
 done
 
 OLDIFS=${IFS}
