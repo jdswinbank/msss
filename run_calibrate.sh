@@ -212,24 +212,29 @@ for pid in ${child_pids[*]}; do
     wait $pid
 done
 
-echo -n "msin=[" > NDPPP.parset
+declare -a SUBBAND_LIST
+subbandctr=0 # length of SUBBAND_LIST
 for num in {0..9}; do
     ms="${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp"
-    echo ${ms}
     if [ -d ${ms} ]; then
-        echo -n "${ms}," >> NDPPP.parset
+        SUBBAND_LIST[$((subbandctr++))]=${ms}
     else
         warning "${ms} not found"
         test ${ROBUST} = TRUE || exit 1
     fi
 done
-echo "]" >> NDPPP.parset
-echo "msin.missingdata=true" >> NDPPP.parset
-echo "msin.orderms=false" >> NDPPP.parset
-echo "msin.datacolumn=CORRECTED_DATA" >> NDPPP.parset
-echo "msout="${combined} >> NDPPP.parset
-echo "steps=[]" >> NDPPP.parset
-echo "" >> NDPPP.parset
+
+OLDIFS=${IFS}
+IFS="," # We need to separate subbands with commas for NDPPP
+cat >NDPPP.parset <<-EOF
+    msin=[${SUBBAND_LIST[*]}]
+    msin.missingdata=true
+    msin.orderms=false
+    msin.datacolumn=CORRECTED_DATA
+    msout=${combined}
+    steps=[]
+EOF
+IFS=${OLDIFS}
 
 echo "Starting work on combined subbands" `date`
 echo "Combining Subbands..."
