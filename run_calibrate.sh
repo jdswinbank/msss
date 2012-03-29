@@ -191,10 +191,10 @@ process_subband() {
     log "Calibrating ${cal}"
     calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${calModel} > log/calibrate_cal_${num}.txt 2>&1
 
-    log "Zapping suspect points for SB${cal_band}${num}"
+    log "Zapping suspect points in ${cal}/instrument"
     ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/ > log/edit_parmdb_${num}.txt 2>&1
 
-    log "Making diagnostic plots for SB${cal_band}${num}"
+    log "Making diagnostic plots for ${cal}/instrument"
     ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/ > log/solplot_${num}.txt 2>&1
 
     log "Calibrating ${source}"
