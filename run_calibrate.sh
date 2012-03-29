@@ -6,6 +6,33 @@
 #
 # Bug reports, patches etc to <swinbank@transientskp.org>
 
+# If anything goes wrong, we'll print a helpful(-ish) messge and exit
+COLOUR_RED_BOLD=`tput setaf 1 && tput bold`
+COLOUR_YELLOW_BOLD=`tput setaf 3 && tput bold`
+COLOUR_GREEN_BOLD=`tput setaf 2 && tput bold`
+COLOUR_NONE=`tput sgr0`
+
+error()
+{
+    echo ${COLOUR_RED_BOLD}[`date +%FT%T` ERR ]${COLOUR_NONE} ${1}
+}
+
+warning()
+{
+    echo ${COLOUR_YELLOW_BOLD}[`date +%FT%T` WARN]${COLOUR_NONE} ${1}
+}
+
+log()
+{
+    echo ${COLOUR_GREEN_BOLD}[`date +%FT%T` INFO]${COLOUR_NONE} ${1}
+}
+
+failure()
+{
+    error "${BASH_COMMAND} failed"
+    exit 1
+}
+
 # Default values; can be overriden on command line
 CAL_PARSET=cal.parset
 CORRECT_PARSET=correct.parset
@@ -94,28 +121,7 @@ band=${3}
 skyModel=${4}
 calModel=${5}
 
-# If anything goes wrong, we'll print a helpful(-ish) messge and exit
-COLOUR_RED_BOLD=`tput setaf 1 && tput bold`
-COLOUR_YELLOW_BOLD=`tput setaf 3 && tput bold`
-COLOUR_NONE=`tput sgr0`
-
-error()
-{
-    echo ${COLOUR_RED_BOLD}[ERROR]${COLOUR_NONE} ${1}
-}
-
-warning()
-{
-    echo ${COLOUR_YELLOW_BOLD}[WARNING]${COLOUR_NONE} ${1}
-}
-
-failure()
-{
-    error "${BASH_COMMAND} failed"
-    exit 1
-}
-
-echo "Starting ${0} at" `date`
+log "Starting ${0}"
 
 test -d log || mkdir log
 test -d plots || mkdir plots
@@ -129,11 +135,11 @@ elif [ "${beam}" =  1 ]; then
 fi
 
 if [ ${COLLECT} = "TRUE" ]; then
-    echo "Collecting data..." `date`
+    log "Collecting data"
     for node in `seq -w 1 100`; do
         echo locus$node
     done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* . >> log/collect.log 2>&1
-    echo "scp-ing done!" `date`
+    log "Data collected"
 fi
 
 # From this point on, any failures are fatal
@@ -152,7 +158,7 @@ fi
 
 if [ -d ${OUTPUT_NAME} ]; then
     if [ ${CLOBBER} = "TRUE" ]; then
-        echo "Removing ${OUTPUT_NAME}"
+        log "Removing ${OUTPUT_NAME}"
         rm -rf ${OUTPUT_NAME}
     else
         error "${OUTPUT_NAME} already exists; aborting"
@@ -161,39 +167,40 @@ if [ -d ${OUTPUT_NAME} ]; then
 fi
 
 if [ -d ${combined} ]; then
-    echo "Removing ${combined}"
+    log "Removing ${combined}"
     rm -rf ${combined}
 fi
 
 # We'll need these sourcedbs a number of times, so might as well build them
 # once and reuse.
-echo "Building calibrator sourcedb..."
+log "Building calibrator sourcedb"
 test -d sky.calibrator && rm -rf sky.calibrator
-makesourcedb in=${calModel} out=sky.calibrator format='<'
+makesourcedb in=${calModel} out=sky.calibrator format='<' >> log/make_calibrator_sourcedb.log 2>&1
 
-echo "Building dummy sourcedb..."
+log "Building dummy sourcedb"
 test -d sky.dummy && rm -rf sky.dummy
-makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<'
+makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<' >> log/make_dummy_sourcedb.log 2>&1
 
 process_subband() {
     num=${1}
     source=${2}
     cal=${3}
     trap failure ERR # Enable error handler in subshell
-    echo "Starting work on " $source `date`
+    log "Starting work on ${source}"
 
-    echo "Calibrating ${cal}..."
-    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${calModel} > log/calibrate_cal_${num}.txt
+    log "Calibrating ${cal}"
+    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${calModel} > log/calibrate_cal_${num}.txt 2>&1
 
-    echo "Zapping suspect points for SB${cal_band}${num}..."
+    log "Zapping suspect points for SB${cal_band}${num}"
     ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/ > log/edit_parmdb_${num}.txt 2>&1
 
-    echo "Making diagnostic plots for SB${cal_band}${num}..."
-    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/
+    log "Making diagnostic plots for SB${cal_band}${num}"
+    ~heald/bin/solplot.py -q -m -o SB${cal_band}${num} ${cal}/instrument/ > log/solplot_${num}.txt 2>&1
 
-    echo "Calibrating ${source}..."
-    calibrate-stand-alone --sourcedb sky.dummy --parmdb ${cal}/instrument ${source} ${CORRECT_PARSET} /home/hassall/MSSS/dummy.model > log/calibrate_transfer_${num}.txt
-    echo "Finished subband" ${num} `date`
+    log "Calibrating ${source}"
+    calibrate-stand-alone --sourcedb sky.dummy --parmdb ${cal}/instrument ${source} ${CORRECT_PARSET} /home/hassall/MSSS/dummy.model > log/calibrate_transfer_${num}.txt 2>&1
+
+    log "Finished ${source}"
 }
 
 declare -a SUBBAND_LIST
@@ -217,16 +224,22 @@ for num in {0..9}; do
 done
 
 bandctr=0
-for source in ${SUBBAND_LIST[@]}; do
-    process_subband ${bandctr} ${source} ${CALBAND_LIST[$bandctr]} &
-    child_pids[num]=$!
-    let bandctr=${bandctr}+1
-done
-for pid in ${child_pids[*]}; do
-    # Wait for all bands to be processed
-    wait $pid
-done
+if [ ${SUBBAND_LIST} ]; then
+    for source in ${SUBBAND_LIST[@]}; do
+        process_subband ${bandctr} ${source} ${CALBAND_LIST[$bandctr]} &
+        child_pids[num]=$!
+        let bandctr=${bandctr}+1
+    done
+    for pid in ${child_pids[*]}; do
+        # Wait for all bands to be processed
+        wait $pid
+    done
+else
+    error "No data to process"
+    exit 1
+fi
 
+log "Combining Subbands..."
 OLDIFS=${IFS}
 IFS="," # We need to separate subbands with commas for NDPPP
 cat >NDPPP.parset <<-EOF
@@ -239,25 +252,20 @@ cat >NDPPP.parset <<-EOF
     steps=[]
 EOF
 IFS=${OLDIFS}
+NDPPP NDPPP.parset log>ndppp_log.txt 2>&1
 
-echo "Starting work on combined subbands" `date`
-echo "Combining Subbands..."
-NDPPP NDPPP.parset
+log "Removing RFI"
+rficonsole -indirect-read ${combined} > log/rficonsole.txt 2>&1
 
-echo "rficonsole..."
-echo "Removing RFI... " `date`
-rficonsole -indirect-read ${combined}
+log "Starting phase-only calibration of ${combined}"
+calibrate-stand-alone -f ${combined} ${PHASE_PARSET} ${skyModel} > log/calibrate_phaseonly.txt 2>&1
+log "Finished phase-only calibration"
 
-echo "Calibrating ${combined}"
-echo "Starting phase-only calibration" `date`
-calibrate-stand-alone -f ${combined} ${PHASE_PARSET} ${skyModel} > log/calibrate_phaseonly.txt
-
-echo "Finished phase-only calibration" `date`
 mv SB*.pdf plots
 mv calibrate-stand-alone*log log
 
 if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
-    echo "Flagging bad stations... " `date`
+    log "Flagging bad stations"
     ~martinez/plotting/asciistats.py -i ${combined} -r stats
     ~martinez/plotting/statsplot.py -i `pwd`/stats/${combined}.stats -o ${obs_id}
     for station in `grep True$ ${obs_id}.tab | cut -f2`; do
@@ -266,13 +274,13 @@ if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
 fi
 
 if [ ${BAD_STATION_LIST} ]; then
-    echo "Flagging stations: ${BAD_STATION_LIST[*]}"
+    log "Flagging stations: ${BAD_STATION_LIST[*]}"
     FILTER=`echo "!${BAD_STATION_LIST[*]}" | sed -e's/ /;!/g'`
 else
     FILTER=""
 fi
 
-msselect in=${combined} out=${OUTPUT_NAME} baseline=${FILTER} deep=True
+msselect in=${combined} out=${OUTPUT_NAME} baseline=${FILTER} deep=True > log/msselect.log 2>&1
 
-echo "Data written to ${OUTPUT_NAME}."
-echo "${0} finished at" `date`
+log "Data written to ${OUTPUT_NAME}"
+log "${0} finished"
