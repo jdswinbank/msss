@@ -239,7 +239,7 @@ else
     exit 1
 fi
 
-log "Combining Subbands..."
+log "Combining subbands"
 OLDIFS=${IFS}
 IFS="," # We need to separate subbands with commas for NDPPP
 cat >NDPPP.parset <<-EOF
