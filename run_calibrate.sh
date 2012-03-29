@@ -136,9 +136,9 @@ fi
 
 if [ ${COLLECT} = "TRUE" ]; then
     log "Collecting data"
-    for node in `seq -w 1 100`; do
+    for node in {01..100} ; do
         echo locus$node
-    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* . >> log/collect.log 2>&1
+    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* . > log/collect.log 2>&1
     log "Data collected"
 fi
 
@@ -175,11 +175,11 @@ fi
 # once and reuse.
 log "Building calibrator sourcedb"
 test -d sky.calibrator && rm -rf sky.calibrator
-makesourcedb in=${calModel} out=sky.calibrator format='<' >> log/make_calibrator_sourcedb.log 2>&1
+makesourcedb in=${calModel} out=sky.calibrator format='<' > log/make_calibrator_sourcedb.log 2>&1
 
 log "Building dummy sourcedb"
 test -d sky.dummy && rm -rf sky.dummy
-makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<' >> log/make_dummy_sourcedb.log 2>&1
+makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<' > log/make_dummy_sourcedb.log 2>&1
 
 process_subband() {
     num=${1}
