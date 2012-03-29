@@ -155,7 +155,7 @@ if [ -d ${OUTPUT_NAME} ]; then
         echo "Removing ${OUTPUT_NAME}"
         rm -rf ${OUTPUT_NAME}
     else
-        echo "${OUTPUT_NAME} already exists; aborting"
+        error "${OUTPUT_NAME} already exists; aborting"
         exit 1
     fi
 fi
@@ -219,8 +219,8 @@ done
 bandctr=0
 for source in ${SUBBAND_LIST[@]}; do
     process_subband ${bandctr} ${source} ${CALBAND_LIST[$bandctr]} &
-    let bandctr=${bandctr}+1
     child_pids[num]=$!
+    let bandctr=${bandctr}+1
 done
 for pid in ${child_pids[*]}; do
     # Wait for all bands to be processed
