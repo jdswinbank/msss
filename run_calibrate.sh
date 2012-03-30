@@ -33,6 +33,9 @@ failure()
     exit 1
 }
 
+# For safety reasons, failures are fatal
+trap failure ERR
+
 # Default values; can be overriden on command line
 CAL_PARSET=cal.parset
 CORRECT_PARSET=correct.parset
@@ -123,28 +126,6 @@ calModel=${5}
 
 log "Starting ${0}"
 
-test -d log || mkdir log
-test -d plots || mkdir plots
-
-if [ "${beam}" = 0 ]; then
-    targ_band=0`echo $band | bc`
-    cal_band=`echo $band+16 | bc`
-elif [ "${beam}" =  1 ]; then
-    targ_band=`echo $band+8 | bc`
-    cal_band=`echo $band+16 | bc`
-fi
-
-if [ ${COLLECT} = "TRUE" ]; then
-    log "Collecting data"
-    for node in {01..100} ; do
-        echo locus$node
-    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* . > log/collect.log 2>&1
-    log "Data collected"
-fi
-
-# From this point on, any failures are fatal
-trap failure ERR
-
 if [ ! ${OUTPUT_NAME} ]; then
     OUTPUT_NAME=${obs_id}_SAP00${beam}_BAND${band}.MS
 fi
@@ -160,6 +141,27 @@ fi
 
 WORK_NAME=${OUTPUT_NAME}.tmp
 rm -rf ${WORK_NAME}
+
+test -d log || mkdir log
+test -d plots || mkdir plots
+
+if [ ${beam} -eq 0 ]; then
+    targ_band=0`echo $band | bc`
+    cal_band=`echo $band+16 | bc`
+elif [ ${beam} -eq  1 ]; then
+    targ_band=`echo $band+8 | bc`
+    cal_band=`echo $band+16 | bc`
+fi
+
+if [ ${COLLECT} = "TRUE" ]; then
+    trap ERR # scp commands will fail by design!
+    log "Collecting data"
+    for node in {01..100} ; do
+        echo locus$node
+    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* . > log/collect.log 2>&1
+    log "Data collected"
+    trap failure ERR
+fi
 
 # We'll need these sourcedbs a number of times, so might as well build them
 # once and reuse.
@@ -242,7 +244,7 @@ cat >NDPPP.parset <<-EOF
     steps=[]
 EOF
 IFS=${OLDIFS}
-NDPPP NDPPP.parset log/ndppp_log.txt 2>&1
+NDPPP NDPPP.parset > log/ndppp_log.txt 2>&1
 
 log "Removing RFI"
 rficonsole -indirect-read ${WORK_NAME} > log/rficonsole.txt 2>&1
