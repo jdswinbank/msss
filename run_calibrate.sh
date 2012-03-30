@@ -242,7 +242,7 @@ cat >NDPPP.parset <<-EOF
     steps=[]
 EOF
 IFS=${OLDIFS}
-NDPPP NDPPP.parset log>ndppp_log.txt 2>&1
+NDPPP NDPPP.parset log/ndppp_log.txt 2>&1
 
 log "Removing RFI"
 rficonsole -indirect-read ${WORK_NAME} > log/rficonsole.txt 2>&1
