@@ -145,20 +145,15 @@ rm -rf ${WORK_NAME}
 test -d log || mkdir log
 test -d plots || mkdir plots
 
-if [ ${beam} -eq 0 ]; then
-    targ_band=0`echo $band | bc`
-    cal_band=`echo $band+16 | bc`
-elif [ ${beam} -eq  1 ]; then
-    targ_band=`echo $band+8 | bc`
-    cal_band=`echo $band+16 | bc`
-fi
+targ_band=`printf %02d $(($beam*8+$band))`
+cal_band=`printf %02d $(($band+16))`
 
 if [ ${COLLECT} = "TRUE" ]; then
     trap ERR # scp commands will fail by design!
     log "Collecting data"
     for node in {01..100} ; do
         echo locus$node
-    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${band},${cal_band}}?_target_sub* . > log/collect.log 2>&1
+    done | xargs -n1 -P4 -Ihost scp -r host:/data/scratch/pipeline/${obs_id}*/*SB{${targ_band},${cal_band}}?_target_sub* . > log/collect.log 2>&1
     log "Data collected"
     trap failure ERR
 fi
