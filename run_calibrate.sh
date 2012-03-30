@@ -252,9 +252,10 @@ mv SB*.pdf plots
 mv calibrate-stand-alone*log log
 
 if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
-    log "Flagging bad stations"
-    ~martinez/plotting/asciistats.py -i ${WORK_NAME} -r stats
-    ~martinez/plotting/statsplot.py -i `pwd`/stats/${WORK_NAME}.stats -o ${obs_id}
+    log "Identifying bad stations"
+    rm -rf stats
+    ~martinez/plotting/asciistats.py -i ${WORK_NAME} -r stats > log/asciistats.txt
+    ~martinez/plotting/statsplot.py -i `pwd`/stats/${WORK_NAME}.stats -o ${obs_id} > log/statsplot.txt
     for station in `grep True$ ${obs_id}.tab | cut -f2`; do
         BAD_STATION_LIST[$((ctr++))]=${station}
     done
