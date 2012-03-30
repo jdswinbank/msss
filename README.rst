@@ -75,7 +75,7 @@ a usage message::
       -h   Display this message
 
   Example:
-      /home/swinbank/msss/run_calibrate.sh L42025 0 06 sky.model 3c295.model
+      /home/swinbank/msss/run_calibrate.sh L42025 0 6 sky.model 3c295.model
 
 The five parameters in ``<>`` angle brackets are all required, and must be
 specified in the order shown. Note that they must come *after* any optional
@@ -171,7 +171,7 @@ by means of a single shell command::
 
   $ for dir in L*; do cd $dir && ~swinbank/msss/run_calibrate.sh -c \
     -f -a ../cal.parset  -g ../correct.parset -p ../phaseonly.parset\
-    $dir 0 06 ../sky.model ../cal.model ; done
+    $dir 0 6 ../sky.model ../cal.model ; done
 
 That's fine in so far as it goes, but if you're really impatient you can
 actually process multiple observations in parallel::
@@ -179,7 +179,7 @@ actually process multiple observations in parallel::
   $ for dir in L*; do echo $dir; done |                                  \
     xargs -Idir -n1 -P4 sh -c 'cd dir && ~swinbank/msss/run_calibrate.sh \
     -c -f -a ../cal.parset  -g ../correct.parset -p ../phaseonly.parset  \
-    dir 0 06 ../sky.model ../cal.model'
+    dir 0 6 ../sky.model ../cal.model'
 
 Phew! That is, admittedly, something of a mouthful, but your data will likely
 be processed by the time you've got yourself a cup of coffee. Note that we
