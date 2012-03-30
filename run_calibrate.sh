@@ -49,7 +49,7 @@ usage() {
     echo -e "Usage:"
     echo -e "    ${0} [options] <obs_id> <beam> <band> <skyModel> <calModel> \n"
     echo -e "Options with string arguments:"
-    echo -e '    -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS.flag)'
+    echo -e '    -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS)'
     echo -e "    -a   Parset for calibration of calibrator (default: ${CAL_PARSET})"
     echo -e "    -g   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
     echo -e "    -p   Parset for phase-only calibration of target (default: ${PHASE_PARSET})"
@@ -145,17 +145,9 @@ fi
 # From this point on, any failures are fatal
 trap failure ERR
 
-#for file in *MS.dppp; do
-#    echo rficonsole -indirect-read $file
-#    rficonsole -indirect-read $file
-#done
-#exit
-
-combined=${obs_id}_SAP00${beam}_BAND${band}.MS
 if [ ! ${OUTPUT_NAME} ]; then
-    OUTPUT_NAME=${combined}.flag
+    OUTPUT_NAME=${obs_id}_SAP00${beam}_BAND${band}.MS
 fi
-
 if [ -d ${OUTPUT_NAME} ]; then
     if [ ${CLOBBER} = "TRUE" ]; then
         log "Removing ${OUTPUT_NAME}"
@@ -166,10 +158,8 @@ if [ -d ${OUTPUT_NAME} ]; then
     fi
 fi
 
-if [ -d ${combined} ]; then
-    log "Removing ${combined}"
-    rm -rf ${combined}
-fi
+WORK_NAME=${OUTPUT_NAME}.tmp
+rm -rf ${WORK_NAME}
 
 # We'll need these sourcedbs a number of times, so might as well build them
 # once and reuse.
@@ -248,17 +238,17 @@ cat >NDPPP.parset <<-EOF
     msin.orderms=false
     msin.datacolumn=CORRECTED_DATA
     msin.baseline=[CR]S*&
-    msout=${combined}
+    msout=${WORK_NAME}
     steps=[]
 EOF
 IFS=${OLDIFS}
 NDPPP NDPPP.parset log>ndppp_log.txt 2>&1
 
 log "Removing RFI"
-rficonsole -indirect-read ${combined} > log/rficonsole.txt 2>&1
+rficonsole -indirect-read ${WORK_NAME} > log/rficonsole.txt 2>&1
 
-log "Starting phase-only calibration of ${combined}"
-calibrate-stand-alone -f ${combined} ${PHASE_PARSET} ${skyModel} > log/calibrate_phaseonly.txt 2>&1
+log "Starting phase-only calibration of ${WORK_NAME}"
+calibrate-stand-alone -f ${WORK_NAME} ${PHASE_PARSET} ${skyModel} > log/calibrate_phaseonly.txt 2>&1
 log "Finished phase-only calibration"
 
 mv SB*.pdf plots
@@ -266,8 +256,8 @@ mv calibrate-stand-alone*log log
 
 if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
     log "Flagging bad stations"
-    ~martinez/plotting/asciistats.py -i ${combined} -r stats
-    ~martinez/plotting/statsplot.py -i `pwd`/stats/${combined}.stats -o ${obs_id}
+    ~martinez/plotting/asciistats.py -i ${WORK_NAME} -r stats
+    ~martinez/plotting/statsplot.py -i `pwd`/stats/${WORK_NAME}.stats -o ${obs_id}
     for station in `grep True$ ${obs_id}.tab | cut -f2`; do
         BAD_STATION_LIST[$((ctr++))]=${station}
     done
@@ -280,7 +270,8 @@ else
     FILTER=""
 fi
 
-msselect in=${combined} out=${OUTPUT_NAME} baseline=${FILTER} deep=True > log/msselect.log 2>&1
+msselect in=${WORK_NAME} out=${OUTPUT_NAME} baseline=${FILTER} deep=True > log/msselect.log 2>&1
+rm -rf ${WORK_NAME}
 
 log "Data written to ${OUTPUT_NAME}"
 log "${0} finished"
