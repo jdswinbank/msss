@@ -269,6 +269,9 @@ else
 fi
 
 msselect in=${WORK_NAME} out=${OUTPUT_NAME} baseline=${FILTER} deep=True > log/msselect.log 2>&1
+if [ -d ${WORK_NAME}/instrument ] && [ ! -d ${OUTPUT_NAME}/instrument ]; then
+    cp -r ${WORK_NAME}/instrument ${OUTPUT_NAME}
+fi
 rm -rf ${WORK_NAME}
 
 log "Data written to ${OUTPUT_NAME}"
