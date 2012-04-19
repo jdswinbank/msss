@@ -45,20 +45,23 @@ CLOBBER=FALSE
 ROBUST=FALSE
 AUTO_FLAG_STATIONS=FALSE
 COLLECT=FALSE
+CAL_MODEL=NONE
 CAL_BEAM=NONE
 declare -a BAD_STATION_LIST
 declare -i ctr=0 # length of BAD_STATION_LIST
 
 usage() {
     echo -e "Usage:"
-    echo -e "    ${0} [options] <obs_id> <beam> <band> <skyModel> <calModel> \n"
-    echo -e "Options with string arguments:"
-    echo -e '    -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS)'
+    echo -e "    ${0} [options] <obs_id> <beam> <band> <skymodel> \n"
+    echo -e "Processing of calibrator band:"
     echo -e "    -b   Calibrator beam (default: ${CAL_BEAM})"
+    echo -e "    -m   Model for calibration of calibrator (default: ${CAL_MODEL})"
     echo -e "    -a   Parset for calibration of calibrator (default: ${CAL_PARSET})"
     echo -e "    -g   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
+    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})\n"
+    echo -e "Other options with string arguments:"
+    echo -e '    -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS)'
     echo -e "    -p   Parset for phase-only calibration of target (default: ${PHASE_PARSET})"
-    echo -e "    -d   Dummy sky model for use in applying gains (default: ${DUMMY_MODEL})"
     echo -e "    -s   Flag a specific station in the output\n"
     echo -e "Options which take no argument:"
     echo -e "    -c   Collect data prior to processing"
@@ -67,10 +70,10 @@ usage() {
     echo -e "    -w   Overwrite output file if it already exists"
     echo -e "    -h   Display this message\n"
     echo -e "Example:"
-    echo -e "    ${0} L42025 0 6 sky.model 3c295.model"
+    echo -e "    ${0} L42025 0 6 sky.model"
 }
 
-while getopts ":o:b:a:g:p:d:s:crfhw" opt; do
+while getopts ":o:b:m:a:g:p:d:s:crfhw" opt; do
     case $opt in
         o)
             OUTPUT_NAME=${OPTARG}
@@ -80,6 +83,9 @@ while getopts ":o:b:a:g:p:d:s:crfhw" opt; do
             ;;
         a)
             CAL_PARSET=${OPTARG}
+            ;;
+        m)
+            CAL_MODEL=${OPTARG}
             ;;
         g)
             CORRECT_PARSET=${OPTARG}
@@ -119,7 +125,7 @@ done
 
 # Now read out required positional parameters
 shift $(( OPTIND-1 ))
-if [ $# -ne 5 ]; then
+if [ $# -ne 4 ]; then
     usage
     exit 1
 fi
@@ -127,7 +133,6 @@ obs_id=${1}
 beam=${2}
 band=${3}
 skyModel=${4}
-calModel=${5}
 
 log "Starting ${0}"
 
@@ -162,17 +167,32 @@ if [ ${COLLECT} = "TRUE" ]; then
     trap failure ERR
 fi
 
-# We'll need these sourcedbs a number of times, so might as well build them
-# once and reuse.
+require_file() {
+    if [ ! -f ${1} ]; then
+        error "${1} does not exist"
+        exit 1
+    fi
+}
+
+require_file ${skyModel}
+require_file ${PHASE_PARSET}
 if [ ${cal_band} ]; then
+    # Check for required inputs.
+    require_file ${CAL_MODEL}
+    require_file ${CAL_PARSET}
+    require_file ${CORRECT_PARSET}
+    require_file ${DUMMY_MODEL}
+
+    # We'll need these sourcedbs a number of times, so might as well build them
+    # once and reuse.
     log "Building calibrator sourcedb"
     test -d sky.calibrator && rm -rf sky.calibrator
-    makesourcedb in=${calModel} out=sky.calibrator format='<' > log/make_calibrator_sourcedb.log 2>&1
-fi
+    makesourcedb in=${CAL_MODEL} out=sky.calibrator format='<' > log/make_calibrator_sourcedb.log 2>&1
 
-log "Building dummy sourcedb"
-test -d sky.dummy && rm -rf sky.dummy
-makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<' > log/make_dummy_sourcedb.log 2>&1
+    log "Building dummy sourcedb"
+    test -d sky.dummy && rm -rf sky.dummy
+    makesourcedb in=${DUMMY_MODEL} out=sky.dummy format='<' > log/make_dummy_sourcedb.log 2>&1
+fi
 
 process_subband() {
     num=${1}
@@ -182,7 +202,7 @@ process_subband() {
     log "Starting work on ${source}"
 
     log "Calibrating ${cal}"
-    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${calModel} > log/calibrate_cal_${num}.txt 2>&1
+    calibrate-stand-alone --replace-parmdb --sourcedb sky.calibrator ${cal} ${CAL_PARSET} ${CAL_MODEL} > log/calibrate_cal_${num}.txt 2>&1
 
     log "Zapping suspect points in ${cal}/instrument"
     ~swinbank/edit_parmdb/edit_parmdb.py --sigma=1 --auto ${cal}/instrument/ > log/edit_parmdb_${num}.txt 2>&1
@@ -245,6 +265,7 @@ if [ ${cal_band} ]; then
         error "No data to process"
         exit 1
     fi
+    mv SB*.pdf plots
 fi
 
 log "Combining subbands"
@@ -269,7 +290,6 @@ log "Starting phase-only calibration of ${WORK_NAME}"
 calibrate-stand-alone -f ${WORK_NAME} ${PHASE_PARSET} ${skyModel} > log/calibrate_phaseonly.txt 2>&1
 log "Finished phase-only calibration"
 
-mv SB*.pdf plots
 mv calibrate-stand-alone*log log
 
 if [ ${AUTO_FLAG_STATIONS} = "TRUE" ]; then
