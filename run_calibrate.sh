@@ -45,6 +45,7 @@ CLOBBER=FALSE
 ROBUST=FALSE
 AUTO_FLAG_STATIONS=FALSE
 COLLECT=FALSE
+CAL_BEAM=NONE
 declare -a BAD_STATION_LIST
 declare -i ctr=0 # length of BAD_STATION_LIST
 
@@ -53,6 +54,7 @@ usage() {
     echo -e "    ${0} [options] <obs_id> <beam> <band> <skyModel> <calModel> \n"
     echo -e "Options with string arguments:"
     echo -e '    -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS)'
+    echo -e "    -b   Calibrator beam (default: ${CAL_BEAM})"
     echo -e "    -a   Parset for calibration of calibrator (default: ${CAL_PARSET})"
     echo -e "    -g   Parset applying gain calibration to target (default: ${CORRECT_PARSET})"
     echo -e "    -p   Parset for phase-only calibration of target (default: ${PHASE_PARSET})"
@@ -68,10 +70,13 @@ usage() {
     echo -e "    ${0} L42025 0 6 sky.model 3c295.model"
 }
 
-while getopts ":o:a:g:p:d:s:crfhw" opt; do
+while getopts ":o:b:a:g:p:d:s:crfhw" opt; do
     case $opt in
         o)
             OUTPUT_NAME=${OPTARG}
+            ;;
+        b)
+            cal_band=`printf %02d $((${OPTARG}*8))`
             ;;
         a)
             CAL_PARSET=${OPTARG}
@@ -146,7 +151,6 @@ test -d log || mkdir log
 test -d plots || mkdir plots
 
 targ_band=`printf %02d $(($beam*8+$band))`
-cal_band=`printf %02d $(($band+16))`
 
 if [ ${COLLECT} = "TRUE" ]; then
     trap ERR # scp commands will fail by design!
@@ -160,9 +164,11 @@ fi
 
 # We'll need these sourcedbs a number of times, so might as well build them
 # once and reuse.
-log "Building calibrator sourcedb"
-test -d sky.calibrator && rm -rf sky.calibrator
-makesourcedb in=${calModel} out=sky.calibrator format='<' > log/make_calibrator_sourcedb.log 2>&1
+if [ ${cal_band} ]; then
+    log "Building calibrator sourcedb"
+    test -d sky.calibrator && rm -rf sky.calibrator
+    makesourcedb in=${calModel} out=sky.calibrator format='<' > log/make_calibrator_sourcedb.log 2>&1
+fi
 
 log "Building dummy sourcedb"
 test -d sky.dummy && rm -rf sky.dummy
@@ -198,32 +204,47 @@ for num in {0..9}; do
     source=${obs_id}_SAP00${beam}_SB${targ_band}${num}_target_sub.MS.dppp
     cal=${obs_id}_SAP002_SB${cal_band}${num}_target_sub.MS.dppp
 
-    if [ -d ${source} ] && [ -d ${cal} ];  then
+    if [ -d ${source} ]; then
         SUBBAND_LIST[${bandctr}]=${source}
-        CALBAND_LIST[$((bandctr++))]=${cal}
     else
-        warning "Target ${source} and/or calibrator ${cal} not found"
+        warning "Target ${source} and not found"
         if [ ${ROBUST} != "TRUE" ]; then
             error "Missing data"
             exit 1
         fi
     fi
+
+    if [ ${cal_band} ]; then
+        if [ -d ${cal} ];  then
+            CALBAND_LIST[${bandctr}]=${cal}
+        else
+            warning "Calibrator ${cal} and not found"
+            if [ ${ROBUST} != "TRUE" ]; then
+                error "Missing data"
+                exit 1
+            fi
+        fi
+    fi
+
+    let bandctr=${bandctr}+1
 done
 
-bandctr=0
-if [ ${SUBBAND_LIST} ]; then
-    for source in ${SUBBAND_LIST[@]}; do
-        process_subband ${bandctr} ${source} ${CALBAND_LIST[$bandctr]} &
-        child_pids[num]=$!
-        let bandctr=${bandctr}+1
-    done
-    for pid in ${child_pids[*]}; do
-        # Wait for all bands to be processed
-        wait $pid
-    done
-else
-    error "No data to process"
-    exit 1
+if [ ${cal_band} ]; then
+    bandctr=0
+    if [ ${SUBBAND_LIST} ]; then
+        for source in ${SUBBAND_LIST[@]}; do
+            process_subband ${bandctr} ${source} ${CALBAND_LIST[$bandctr]} &
+            child_pids[num]=$!
+            let bandctr=${bandctr}+1
+        done
+        for pid in ${child_pids[*]}; do
+            # Wait for all bands to be processed
+            wait $pid
+        done
+    else
+        error "No data to process"
+        exit 1
+    fi
 fi
 
 log "Combining subbands"
