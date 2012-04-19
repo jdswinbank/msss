@@ -1,9 +1,9 @@
 =========================================
 Techniques for quick MSSS data processing
 =========================================
--------------------------
-John Swinbank, March 2012
--------------------------
+-------------------------------
+John Swinbank, March/April 2012
+-------------------------------
 
 This document describes scripts and techniques which may be used for rapidly
 processing data as part of the ongoing MSSS commissioning effort.
@@ -28,13 +28,16 @@ use ``6``) of an observation ("obs_id"; in the following examples, we'll use
   directories on the compute nodes (where it is stored after standard
   processing) to your work area.
 
-- Use ``BBS`` to determine gain solutions for the calibrator beam.
+- (Optionally) Run BBS on a calibrator beam and transfer solutions to the
+  target. That is:
 
-- Eliminate aberrant points in those solutions using ``edit_parmdb.py``.
+    - Use ``BBS`` to determine gain solutions for the calibrator beam.
 
-- Make diagnostic plots of the results with ``solplot.py``.
+    - Eliminate aberrant points in those solutions using ``edit_parmdb.py``.
 
-- Transfer the gain solutions to the target field.
+    - Make diagnostic plots of the results with ``solplot.py``.
+
+    - Transfer the gain solutions to the target field.
 
 - Combine all subbands using ``NDPPP``.
 
@@ -56,15 +59,18 @@ another tool of your choice.
 a usage message::
 
   $ ~swinbank/msss/run_calibrate.sh
-  Usage:
-      /home/swinbank/msss/run_calibrate.sh [options] <obs_id> <beam> <band> <skyModel> <calModel>
+  Usage:    /home/swinbank/msss2/run_calibrate.sh [options] <obs_id> <beam> <band> <skymodel>
 
-  Options with string arguments:
-      -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS.flag)
+  Processing of calibrator band:
+      -b   Calibrator beam (default: NONE)
+      -m   Model for calibration of calibrator (default: NONE)
       -a   Parset for calibration of calibrator (default: cal.parset)
       -g   Parset applying gain calibration to target (default: correct.parset)
-      -p   Parset for phase-only calibration of target (default: phaseonly.parset)
       -d   Dummy sky model for use in applying gains (default: /home/hassall/MSSS/dummy.model)
+
+  Other options with string arguments:
+      -o   Output filename (default: ${obs_id}_SAP00${beam}_BAND${band}.MS)
+      -p   Parset for phase-only calibration of target (default: phaseonly.parset)
       -s   Flag a specific station in the output
 
   Options which take no argument:
@@ -75,17 +81,16 @@ a usage message::
       -h   Display this message
 
   Example:
-      /home/swinbank/msss/run_calibrate.sh L42025 0 6 sky.model 3c295.model
+      /home/swinbank/msss2/run_calibrate.sh L42025 0 6 sky.model
 
-The five parameters in ``<>`` angle brackets are all required, and must be
+The four parameters in ``<>`` angle brackets are all required, and must be
 specified in the order shown. Note that they must come *after* any optional
 arguments, as shown in the usage message. Filenames are specified relative to
 the current working directory: you might well find it safest to use full paths
 (``/home/swinbank/msss/sky.model`` etc) to avoid confusion. It is hoped that
-``obs_id``, ``beam`` and ``band`` are self-explanatory. ``skyModel`` is a
+``obs_id``, ``beam`` and ``band`` are self-explanatory. ``skymodel`` is a
 model (in ``makesourcedb`` format)  which will be used when performing
-phase-only calibration on the target field. ``calModel`` is a model used for
-calibrating the calibrator field.
+phase-only calibration on the target field.
 
 By default, the script will look for configuration parsets for ``BBS`` in your
 current working directory: ``cal.parset``, ``correct.parset`` and
@@ -105,6 +110,12 @@ fatal error, and ``run_calibrate.sh`` stops. If ``-r`` is specified,
 processing will continnue with whatever subbands are available. *Note* that if
 you specify this option, you must carefully check the log to see which
 subbands have been included!
+
+if ``-b`` is used to specify a calibrator beam (eg ``-b 2``), then calibration
+will first be performed to that beam, then the resulting intrument database
+will be applied to the target beam. If ``-b`` is not specified, this stage of
+processing is skipped. If ``-b`` is specified, appropriate values *must* also
+be provided for ``-m``, ``-a``, ``-g`` and ``-d``, as per the usage message.
 
 The ``-s`` option enables you to remove specific stations from the output. It
 may be specified multiple times and the results are cumulative.
